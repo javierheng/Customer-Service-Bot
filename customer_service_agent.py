@@ -60,18 +60,36 @@ chain_with_history = RunnableWithMessageHistory(
     history_messages_key="chat_history",
 )
 
-def get_ai_response(user_message: str, session_id: str) -> str:
+# def get_ai_response(user_message: str, session_id: str) -> str:
+#     """
+#     调用大模型，生成客服回复内容
+#     - user_message: 当前用户输入
+#     - chat_history: 过往对话历史（可用于上下文）
+#     """
+
+#     response = chain_with_history.invoke(
+#         {"user_message": user_message},
+#         config={"configurable": {"session_id": session_id}}
+#     )
+#     return response
+
+#修改成流式输出的版本
+def get_ai_response(user_message: str, session_id: str):
     """
     调用大模型，生成客服回复内容
     - user_message: 当前用户输入
     - chat_history: 过往对话历史（可用于上下文）
     """
 
-    response = chain_with_history.invoke(
+    partial_answer = ""
+
+    for chunk in chain_with_history.stream(
         {"user_message": user_message},
         config={"configurable": {"session_id": session_id}}
-    )
-    return response
+    ):
+        if chunk:
+            partial_answer += chunk
+            yield partial_answer
 
 def chat_handler(message: str, history: list) -> str:
     """
@@ -82,8 +100,8 @@ def chat_handler(message: str, history: list) -> str:
     3. 返回 AI 回复以更新界面
     """
     session_id = "user_001"
-    ai_reply = get_ai_response(message, session_id)
-    return ai_reply
+    for parital in get_ai_response(message, session_id):
+        yield parital
 
 #使用 Gradio 创建聊天界面
 chat_ui = gr.ChatInterface(
